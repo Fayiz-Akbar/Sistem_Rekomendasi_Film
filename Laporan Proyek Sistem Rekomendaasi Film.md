@@ -115,9 +115,9 @@ Tahapan persiapan data dilakukan untuk memastikan data bersih, konsisten, dan si
     ```
     - The Million Dollar Hotel
     - Once Were Warriors
-    - Red River
     - Galaxy Quest
-    - Cousin, Cousine
+    - Leben nach Microsoft
+    - The Unforgiven
 
     ```
     *(Catatan: Model hanya menghasilkan satu rekomendasi karena adanya inkonsistensi data, di mana 9 dari 10 movieId teratas yang direkomendasikan SVD tidak memiliki data metadata dalam subset film yang digunakan).*
