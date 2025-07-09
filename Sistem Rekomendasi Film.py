@@ -34,6 +34,10 @@ movie_data = pd.merge(ratings_df, movies_df[['movieId', 'title', 'genres']], on=
 print("\nContoh data setelah digabung:")
 print(movie_data.head())
 
+print("Movie_Data yang kosong berjumlah :", movie_data.isnull().sum())
+
+movie_data.info()
+
 sns.set(style='whitegrid')
 
 # Hitung jumlah rating untuk setiap film
@@ -108,7 +112,6 @@ def get_content_based_recommendations(title, cosine_sim_matrix=cosine_sim_subset
     indices = pd.Series(movie_features.index, index=movie_features['title']).drop_duplicates()
     try:
         idx = indices[title]
-        # Dapatkan indeks lokal dari matriks subset
         local_idx = movie_features.index.get_loc(idx)
     except KeyError:
         return f"Film dengan judul '{title}' tidak ditemukan atau tidak termasuk dalam subset populer."
@@ -118,7 +121,9 @@ def get_content_based_recommendations(title, cosine_sim_matrix=cosine_sim_subset
     sim_scores = sim_scores[1:11]
     
     movie_indices = [i[0] for i in sim_scores]
-    return movie_features['title'].iloc[movie_indices]
+    
+    # Mengembalikan judul dan genre
+    return movie_features[['title', 'genres']].iloc[movie_indices]
 
 # Dapatkan rekomendasi untuk salah satu film populer
 recommendations = get_content_based_recommendations('The Dark Knight')
@@ -156,6 +161,58 @@ predictions = model_svd.test(testset)
 # Hitung dan cetak Precision@10
 precision_at_10 = precision_recall_at_k(predictions, k=10, threshold=4.0)
 print(f"\nPrecision@10 untuk model SVD: {precision_at_10:.4f}")
+
+def calculate_content_based_precision(ratings_df, movie_features_subset, cosine_sim_matrix):
+    # Ambil sampel 500 user yang aktif untuk evaluasi
+    active_users = ratings_df['userId'].value_counts().head(500).index
+    
+    precisions = []
+
+    for user_id in active_users:
+        # 1. Ambil film yang disukai user (ground truth)
+        liked_movies = ratings_df[(ratings_df['userId'] == user_id) & (ratings_df['rating'] >= 4.0)]
+        
+        # Pastikan film yang disukai ada di dalam subset kita
+        liked_movies_in_subset = liked_movies[liked_movies['movieId'].isin(movie_features_subset.index)]
+        
+        if liked_movies_in_subset.empty:
+            continue
+
+        # 2. Ambil satu film sebagai input untuk rekomendasi
+        input_movie_id = liked_movies_in_subset.iloc[0]['movieId']
+        
+        # Cari judul film berdasarkan movieId
+        try:
+            input_movie_title = movie_features_subset.loc[input_movie_id]['title']
+        except KeyError:
+            continue
+
+        # 3. Hasilkan rekomendasi
+        recommendations = get_content_based_recommendations(input_movie_title, cosine_sim_matrix, movie_features_subset)
+        if isinstance(recommendations, str): # Handle jika film tidak ditemukan
+            continue
+            
+        recommended_movie_ids = movie_features_subset[movie_features_subset['title'].isin(recommendations['title'])].index
+        
+        # 4. Hitung item yang relevan dan direkomendasikan
+        # Kita kecualikan film input itu sendiri dari perhitungan
+        relevant_items = set(liked_movies_in_subset['movieId']) - {input_movie_id}
+        relevant_and_recommended = set(recommended_movie_ids) & relevant_items
+        
+        # 5. Hitung precision untuk user ini
+        # Pastikan panjang rekomendasi tidak nol untuk menghindari pembagian dengan nol
+        if len(recommendations) > 0:
+            precision = len(relevant_and_recommended) / len(recommendations)
+            precisions.append(precision)
+
+    # Rata-rata presisi dari semua user yang dievaluasi
+    return sum(precisions) / len(precisions) if precisions else 0
+
+# Jalankan evaluasi
+cbf_precision = calculate_content_based_precision(ratings_df, movie_features_subset, cosine_sim_subset)
+
+# Cetak hasilnya untuk dimasukkan ke laporan
+print(f"Precision@10 untuk Content-Based Filtering: {cbf_precision:.4f}")
 
 def get_collaborative_recommendations(userId, model=model_svd, ratings_df=ratings_df, movie_features=movie_features):
     # Mendapatkan daftar semua movieId unik

@@ -114,6 +114,11 @@ Tahapan persiapan data dilakukan untuk memastikan data bersih, konsisten, dan si
 -   **Hasil Top-N Rekomendasi (untuk User ID 1):**
     ```
     - The Million Dollar Hotel
+    - Once Were Warriors
+    - Red River
+    - Galaxy Quest
+    - Cousin, Cousine
+
     ```
     *(Catatan: Model hanya menghasilkan satu rekomendasi karena adanya inkonsistensi data, di mana 9 dari 10 movieId teratas yang direkomendasikan SVD tidak memiliki data metadata dalam subset film yang digunakan).*
 
@@ -122,23 +127,23 @@ Tahapan persiapan data dilakukan untuk memastikan data bersih, konsisten, dan si
 ## Evaluation
 
 ### Metrik Evaluasi
-Metrik yang digunakan untuk kedua model adalah **Precision@10**. Metrik ini dipilih karena sangat relevan dengan tujuan bisnis, yaitu untuk memastikan 10 rekomendasi teratas yang ditampilkan kepada pengguna memiliki kualitas yang baik dan sesuai dengan selera mereka.
+Metrik yang digunakan untuk kedua model adalah **Precision@10**, yang mengukur seberapa banyak item yang relevan dari 10 item teratas yang direkomendasikan. Metrik ini sangat cocok untuk kasus bisnis di mana kita ingin memastikan rekomendasi yang ditampilkan kepada pengguna memiliki kualitas yang baik dan sesuai dengan selera mereka.
 
 -   Untuk **Collaborative Filtering**, relevansi diukur berdasarkan apakah pengguna memberikan rating tinggi (>= 4.0) pada item yang direkomendasikan.
--   Untuk **Content-Based Filtering**, relevansi diukur berdasarkan kesesuaian genre antara film acuan dengan film-film yang direkomendasikan.
+-   Untuk **Content-Based Filtering**, relevansi diukur dengan mengambil satu film yang disukai pengguna, membuat rekomendasi berdasarkan film tersebut, lalu melihat berapa banyak film yang direkomendasikan yang juga termasuk dalam daftar film yang disukai pengguna.
 
 ### Formula Precision@10:
 $$\text{Precision@10} = \frac{|\text{Jumlah item relevan di 10 rekomendasi teratas}|}{10}$$
-*Item dianggap "relevan" jika rating aslinya dari pengguna >= 4.0 atau jika genrenya sesuai dengan film acuan.*
+*Item dianggap "relevan" jika rating aslinya dari pengguna >= 4.0.*
 
 ### Hasil Evaluasi Model
--   **Content-Based Filtering Precision@10**: **1.0**
--   **Collaborative Filtering (SVD) Precision@10**: **0.9246**
+-   **Content-Based Filtering Precision@10**: **0.1070**
+-   **Collaborative Filtering (SVD) Precision@10**: **0.9253**
 
-Skor untuk Content-Based Filtering adalah 1.0 karena saat diuji dengan 'The Dark Knight' (genre: Action, Crime, Drama, Thriller), semua 10 film yang direkomendasikan memiliki genre yang sangat relevan (mengandung setidaknya salah satu dari genre utama tersebut). Sementara itu, model SVD juga menunjukkan presisi yang sangat tinggi.
+Hasil menunjukkan perbedaan performa yang signifikan. Model Collaborative Filtering (SVD) memiliki presisi yang sangat tinggi, membuktikan kemampuannya dalam menangkap preferensi personal pengguna. Sebaliknya, model Content-Based memiliki presisi yang lebih rendah. Hal ini wajar karena model ini hanya merekomendasikan berdasarkan kemiripan genre, yang bisa jadi tidak selalu sejalan dengan film lain yang disukai pengguna.
 
 ### Hubungan dengan Business Understanding
 Hasil evaluasi menunjukkan bahwa kedua model berhasil menjawab permasalahan bisnis yang telah dirumuskan:
 -   **Jawaban Problem Statement 1 & 2:** Kedua model berhasil dibangun. Model Content-Based mampu merekomendasikan film berdasarkan kemiripan genre, sementara Collaborative Filtering berhasil merekomendasikan film berdasarkan pola rating. Ini memenuhi **Goals 1 & 2**.
--   **Jawaban Problem Statement 3:** Performa kedua model berhasil diukur menggunakan metrik Precision@10, yang menunjukkan tingkat relevansi yang sangat tinggi. Ini memenuhi **Goal 3**.
--   **Dampak Solusi:** Kedua *solution statement* terbukti berdampak. Solusi Content-Based memberikan rekomendasi yang aman dan relevan secara tematik dengan presisi 1.0. Solusi Collaborative Filtering, dengan Precision@10 **0.9246**, terbukti sangat efektif dalam memprediksi film yang akan disukai pengguna, yang secara langsung dapat meningkatkan *engagement* dan retensi pada platform.
+-   **Jawaban Problem Statement 3:** Performa kedua model berhasil diukur menggunakan metrik Precision@10, yang menunjukkan tingkat relevansi yang bervariasi. Ini memenuhi **Goal 3**.
+-   **Dampak Solusi:** Kedua *solution statement* terbukti berdampak. Solusi Collaborative Filtering, dengan Precision@10 **0.9253**, terbukti sangat efektif dalam memprediksi film yang akan disukai pengguna, yang secara langsung dapat meningkatkan *engagement* dan retensi pada platform. Sementara itu, solusi Content-Based, meskipun dengan presisi kuantitatif yang lebih rendah (**0.1070**), tetap berhasil menyediakan rekomendasi yang relevan secara tematik dan dapat diandalkan saat data rating pengguna tidak tersedia.
