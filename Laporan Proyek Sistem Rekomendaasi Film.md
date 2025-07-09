@@ -58,13 +58,36 @@ Proyek ini mengusulkan dua pendekatan solusi untuk membangun sistem rekomendasi:
 
 ## Data Preparation
 
-Tahapan persiapan data dilakukan untuk memastikan data siap digunakan untuk pemodelan.
-1.  **Penggabungan Data**: Menggabungkan `ratings_df` dan `movies_df` menjadi satu DataFrame utama. **Alasan:** Ini dilakukan agar setiap rating memiliki informasi judul dan genre filmnya untuk analisis lebih lanjut.
-2.  **Pembersihan Data Awal**: Membersihkan `movieId` yang tidak valid pada `movies_metadata.csv`. **Alasan:** Langkah ini penting untuk memastikan proses penggabungan data berjalan lancar dan tidak ada data yang hilang karena ketidakcocokan ID.
-3.  **Subset untuk Content-Based Filtering**: Membuat subset `movie_features_subset` yang hanya berisi 15.000 film terpopuler. **Alasan:** Menghitung matriks kemiripan untuk 45.000 film secara langsung menyebabkan `MemoryError`. Dengan membatasi data pada film yang paling relevan, model tetap dapat dibangun tanpa melebihi kapasitas memori.
-4.  **Ekstraksi Fitur dengan TF-IDF**: Mengubah data teks genre menjadi matriks numerik menggunakan `TfidfVectorizer`. **Alasan:** Model machine learning tidak dapat memproses teks mentah. TF-IDF mengubah genre menjadi representasi vektor yang dapat diukur kemiripannya.
-5.  **Sampel dan Konversi Data untuk Collaborative Filtering**: Mengambil sampel 1 juta rating dan mengubahnya ke dalam format `Dataset` library `surprise`. **Alasan:** Pengambilan sampel diperlukan untuk mempercepat proses training model SVD. Konversi ke format `surprise` adalah syarat wajib agar data dapat digunakan oleh algoritma dari library tersebut.
-6.  **Pembagian Data Latih dan Uji**: Membagi data `surprise` menjadi 80% data latih dan 20% data uji. **Alasan:** Ini adalah praktik standar untuk mengevaluasi seberapa baik performa model pada data yang belum pernah dilihat sebelumnya.
+Tahapan persiapan data dilakukan untuk memastikan data bersih, konsisten, dan siap digunakan untuk pemodelan. Proses ini dilakukan secara berurutan untuk menghindari kebocoran data dan memastikan setiap transformasi diterapkan dengan benar.
+
+1.  **Pembersihan Data Awal (`movies_metadata.csv`)**
+    Pada dataset metadata film, ditemukan beberapa baris di mana kolom `id` tidak berisi nilai numerik yang valid. Baris-baris ini dapat menyebabkan eror saat penggabungan data. Oleh karena itu, langkah pertama adalah menghapus baris-baris yang tidak valid ini. Selanjutnya, tipe data kolom `id` diubah menjadi integer (`int`) agar konsisten dengan `movieId` di dataset rating. Kolom ini juga diganti namanya menjadi `movieId` untuk memfasilitasi proses `merge`.
+    ```python
+    # Menghapus baris dengan ID yang tidak valid
+    movies_df = movies_df[movies_df['id'].str.isnumeric()]
+    # Mengubah tipe data kolom 'id'
+    movies_df['id'] = movies_df['id'].astype(int)
+    # Mengganti nama kolom
+    movies_df.rename(columns={'id': 'movieId'}, inplace=True)
+    ```
+
+2.  **Penggabungan Data**
+    Setelah pembersihan awal, DataFrame `ratings_df` dan `movies_df` digabungkan menjadi satu DataFrame utama. Alasan: Ini dilakukan agar setiap data rating memiliki informasi kontekstual seperti judul dan genre filmnya, yang krusial untuk analisis dan pemodelan.
+
+3.  **Exploratory Data Analysis (EDA)**
+    Proses ini dilakukan setelah penggabungan untuk mendapatkan insight dari data gabungan.
+    -   **Distribusi Rating**: Grafik menunjukkan rating 4.0 adalah yang paling sering diberikan.
+        *(Masukkan gambar `rating_distribution.png` di sini)*
+    -   **Film Terpopuler**: Grafik menampilkan 10 film dengan jumlah rating terbanyak.
+        *(Masukkan gambar `top_10_movies.png` di sini)*
+
+4.  **Sampel dan Konversi Data untuk Collaborative Filtering**
+    Sebelum data diproses untuk Content-Based, data untuk Collaborative Filtering disiapkan terlebih dahulu. Sampel acak sebanyak 1 juta rating diambil dari dataset utama. Alasan: Dataset rating asli sangat besar (26 juta baris), sehingga pengambilan sampel diperlukan untuk mempercepat proses training model SVD pada lingkungan dengan sumber daya terbatas. Data sampel ini kemudian dikonversi ke dalam format `Dataset` dari library `surprise`, karena ini adalah format wajib yang diterima oleh algoritma SVD.
+
+5.  **Subset dan Ekstraksi Fitur untuk Content-Based Filtering**
+    Langkah terakhir adalah mempersiapkan data untuk model Content-Based.
+    -   **Subsetting**: Dibuat subset `movie_features_subset` yang hanya berisi 15.000 film terpopuler. Alasan: Menghitung matriks kemiripan untuk semua film secara langsung menyebabkan `MemoryError`. Dengan membatasi data pada film yang paling relevan (paling banyak diulas), model tetap dapat dibangun tanpa melebihi kapasitas memori.
+    -   **Ekstraksi Fitur dengan TF-IDF**: Teks pada kolom `genres` diubah menjadi matriks numerik menggunakan `TfidfVectorizer`. Alasan: Model machine learning tidak dapat memproses teks mentah. TF-IDF mengubah genre menjadi representasi vektor yang dapat diukur kemiripannya.
 
 ---
 
@@ -98,21 +121,24 @@ Tahapan persiapan data dilakukan untuk memastikan data siap digunakan untuk pemo
 
 ## Evaluation
 
-### **Metrik Evaluasi**
-Metrik yang digunakan adalah **Precision@10**, yang mengukur seberapa banyak item yang relevan dari 10 item teratas yang direkomendasikan. Metrik ini sangat cocok untuk kasus bisnis di mana kita ingin memastikan rekomendasi yang ditampilkan di halaman utama benar-benar disukai pengguna.
+### Metrik Evaluasi
+Metrik yang digunakan untuk kedua model adalah **Precision@10**. Metrik ini dipilih karena sangat relevan dengan tujuan bisnis, yaitu untuk memastikan 10 rekomendasi teratas yang ditampilkan kepada pengguna memiliki kualitas yang baik dan sesuai dengan selera mereka.
 
-### **Formula Precision@10:**
+-   Untuk **Collaborative Filtering**, relevansi diukur berdasarkan apakah pengguna memberikan rating tinggi (>= 4.0) pada item yang direkomendasikan.
+-   Untuk **Content-Based Filtering**, relevansi diukur berdasarkan kesesuaian genre antara film acuan dengan film-film yang direkomendasikan.
+
+### Formula Precision@10:
 $$\text{Precision@10} = \frac{|\text{Jumlah item relevan di 10 rekomendasi teratas}|}{10}$$
-*Item dianggap "relevan" jika rating aslinya dari pengguna >= 4.0.*
+*Item dianggap "relevan" jika rating aslinya dari pengguna >= 4.0 atau jika genrenya sesuai dengan film acuan.*
 
-### **Hasil Evaluasi Model**
--   **Content-Based Filtering Precision@10**: **[Masukkan skor dari kode baru]**
--   **Collaborative Filtering (SVD) Precision@10**: **0.9230**
+### Hasil Evaluasi Model
+-   **Content-Based Filtering Precision@10**: **1.0**
+-   **Collaborative Filtering (SVD) Precision@10**: **0.9246**
 
-Skor Precision yang tinggi pada kedua model menunjukkan bahwa rekomendasi yang diberikan sangat relevan dengan preferensi pengguna. Model SVD menunjukkan performa yang sedikit lebih unggul dalam menemukan item relevan berdasarkan pola rating.
+Skor untuk Content-Based Filtering adalah 1.0 karena saat diuji dengan 'The Dark Knight' (genre: Action, Crime, Drama, Thriller), semua 10 film yang direkomendasikan memiliki genre yang sangat relevan (mengandung setidaknya salah satu dari genre utama tersebut). Sementara itu, model SVD juga menunjukkan presisi yang sangat tinggi.
 
-### **Hubungan dengan Business Understanding**
+### Hubungan dengan Business Understanding
 Hasil evaluasi menunjukkan bahwa kedua model berhasil menjawab permasalahan bisnis yang telah dirumuskan:
 -   **Jawaban Problem Statement 1 & 2:** Kedua model berhasil dibangun. Model Content-Based mampu merekomendasikan film berdasarkan kemiripan genre, sementara Collaborative Filtering berhasil merekomendasikan film berdasarkan pola rating. Ini memenuhi **Goals 1 & 2**.
--   **Jawaban Problem Statement 3:** Performa kedua model berhasil diukur menggunakan metrik Precision@10, yang menunjukkan tingkat relevansi yang tinggi. Ini memenuhi **Goal 3**.
--   **Dampak Solusi:** Kedua *solution statement* terbukti berdampak. Solusi Content-Based memberikan rekomendasi yang aman dan relevan secara tematik. Solusi Collaborative Filtering, dengan Precision@10 **0.9230**, terbukti sangat efektif dalam memprediksi film yang akan disukai pengguna, yang secara langsung dapat meningkatkan *engagement* dan retensi pada platform.
+-   **Jawaban Problem Statement 3:** Performa kedua model berhasil diukur menggunakan metrik Precision@10, yang menunjukkan tingkat relevansi yang sangat tinggi. Ini memenuhi **Goal 3**.
+-   **Dampak Solusi:** Kedua *solution statement* terbukti berdampak. Solusi Content-Based memberikan rekomendasi yang aman dan relevan secara tematik dengan presisi 1.0. Solusi Collaborative Filtering, dengan Precision@10 **0.9246**, terbukti sangat efektif dalam memprediksi film yang akan disukai pengguna, yang secara langsung dapat meningkatkan *engagement* dan retensi pada platform.
